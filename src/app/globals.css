@@ -1,0 +1,167 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-pretendard: 'Pretendard Variable', 'Pretendard', system-ui, sans-serif;
+    --font-outfit: 'Outfit', sans-serif;
+  }
+
+  html {
+    font-family: var(--font-pretendard);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-surface-50 text-surface-900;
+    min-height: 100vh;
+  }
+
+  /* 스크롤바 스타일링 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-400;
+  }
+
+  /* 포커스 링 스타일 */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+}
+
+@layer components {
+  /* 그라데이션 텍스트 */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
+  }
+
+  /* 글래스모피즘 효과 */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md;
+  }
+
+  /* 호버 카드 효과 */
+  .hover-card {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
+
+  /* AI 기능 버튼 그룹 */
+  .ai-button-group {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .ai-button {
+    @apply px-3 py-1.5 text-sm font-medium rounded-lg;
+    @apply bg-gradient-to-r from-primary-50 to-accent-50;
+    @apply text-primary-700 border border-primary-200;
+    @apply hover:from-primary-100 hover:to-accent-100;
+    @apply transition-all duration-200;
+  }
+
+  .ai-button:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  /* 에디터 스타일 */
+  .editor-content {
+    @apply prose prose-sm max-w-none;
+    @apply prose-headings:text-surface-900;
+    @apply prose-p:text-surface-700;
+    @apply prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline;
+  }
+
+  /* 사이드바 네비게이션 */
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg;
+    @apply text-surface-600 font-medium;
+    @apply hover:bg-surface-100 hover:text-surface-900;
+    @apply transition-colors duration-200;
+  }
+
+  .sidebar-nav-item.active {
+    @apply bg-primary-50 text-primary-700;
+  }
+
+  /* 테이블 스타일 */
+  .data-table {
+    @apply w-full;
+  }
+
+  .data-table th {
+    @apply px-4 py-3 text-left text-sm font-medium text-surface-500;
+    @apply bg-surface-50 border-b border-surface-200;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 text-sm text-surface-700;
+    @apply border-b border-surface-100;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-surface-50;
+  }
+
+  /* 검수 결과 하이라이트 */
+  .highlight-warning {
+    @apply bg-amber-100 border-b-2 border-amber-400;
+  }
+
+  .highlight-error {
+    @apply bg-red-100 border-b-2 border-red-400;
+  }
+
+  .highlight-suggestion {
+    @apply bg-blue-100 border-b-2 border-blue-400;
+  }
+}
+
+@layer utilities {
+  /* 애니메이션 지연 유틸리티 */
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  /* 그라데이션 배경 */
+  .bg-gradient-primary {
+    @apply bg-gradient-to-br from-primary-500 via-accent-500 to-primary-600;
+  }
+
+  .bg-gradient-subtle {
+    @apply bg-gradient-to-br from-surface-50 to-surface-100;
+  }
+
+  /* 텍스트 그라데이션 */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+  }
+}
+
