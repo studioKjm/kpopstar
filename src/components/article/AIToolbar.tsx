@@ -15,6 +15,7 @@ import {
   LayoutGrid,
   Loader2,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // AI 기능 정의
 const AI_FEATURES = [
@@ -70,6 +71,8 @@ const AI_FEATURES = [
 ];
 
 interface AIToolbarProps {
+  title?: string;
+  subtitle?: string;
   content: string;
   onTagsGenerated?: (tags: string[]) => void;
   onCategorySelected?: (category: string) => void;
@@ -82,6 +85,8 @@ interface AIToolbarProps {
  * 기사 작성 시 사용 가능한 AI 기능 버튼들을 제공
  */
 export function AIToolbar({
+  title,
+  subtitle,
   content,
   onTagsGenerated,
   onCategorySelected,
@@ -91,84 +96,95 @@ export function AIToolbar({
   const [activeFeature, setActiveFeature] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, unknown>>({});
 
-  // AI 기능 실행 (stub)
+  // AI 기능 실행
   const handleFeatureClick = async (featureId: string) => {
     if (!content.trim()) {
-      alert('본문을 먼저 작성해주세요.');
+      toast.error('본문을 먼저 작성해주세요.');
       return;
     }
 
     setActiveFeature(featureId);
 
-    // TODO: 실제 AI API 호출로 대체
-    // 현재는 시뮬레이션 딜레이
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const response = await fetch(`/api/ai/${featureId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title?.trim() || '',
+          subtitle: subtitle?.trim() || '',
+          content: content.trim(),
+          options: featureId === 'summarize' ? { type: 'brief' } : {},
+        }),
+      });
 
-    // Stub 결과 생성
-    const stubResults: Record<string, unknown> = {
-      'auto-tag': {
-        tags: ['뉴진스', '컴백', 'K-POP', '음원차트'],
-        confidence: [0.95, 0.88, 0.85, 0.72],
-      },
-      'fact-check': {
-        isValid: true,
-        issues: [
-          {
-            type: 'date',
-            severity: 'warning',
-            message: '발매일 확인 필요: 1월 15일',
-          },
-        ],
-      },
-      'style-unify': {
-        isConsistent: false,
-        suggestions: [
-          {
-            original: '발매했다',
-            suggested: '발매했다고 밝혔다',
-            reason: '보도체 문체 통일',
-          },
-        ],
-      },
-      'duplicate-check': {
-        hasDuplicates: false,
-        duplicates: [],
-      },
-      'sensitivity-check': {
-        hasSensitiveContent: false,
-        items: [],
-      },
-      'summarize': {
-        summary: '뉴진스가 새 미니앨범을 발매하며 글로벌 차트를 석권했다.',
-        keyPoints: ['새 앨범 발매', '100만 장 돌파', '신기록 경신'],
-      },
-      'category-suggest': {
-        category: '스타뉴스',
-        confidence: 0.92,
-        alternatives: [
-          { category: '엔터테인먼트', confidence: 0.78 },
-        ],
-      },
-    };
+      const data = await response.json();
 
-    const result = stubResults[featureId];
-    setResults((prev) => ({ ...prev, [featureId]: result }));
+      if (!data.success) {
+        throw new Error(data.error || 'AI 기능 실행 중 오류가 발생했습니다.');
+      }
 
-    // 콜백 호출
-    if (featureId === 'auto-tag' && onTagsGenerated) {
-      const tagResult = result as { tags: string[] };
-      onTagsGenerated(tagResult.tags);
+      // 결과 저장
+      setResults((prev) => ({ ...prev, [featureId]: data.data }));
+
+      // 콜백 호출
+      if (featureId === 'auto-tag' && onTagsGenerated && data.data?.tags) {
+        onTagsGenerated(data.data.tags);
+        toast.success(`${data.data.tags.length}개의 태그가 생성되었습니다.`);
+      }
+      if (featureId === 'category-suggest' && onCategorySelected && data.data?.category) {
+        onCategorySelected(data.data.category);
+        toast.success(`카테고리 추천: ${data.data.category}`);
+      }
+      if (featureId === 'summarize' && onSummaryGenerated && data.data?.summary) {
+        onSummaryGenerated(data.data.summary);
+        toast.success('요약이 생성되었습니다.');
+      }
+
+      if (featureId === 'fact-check') {
+        const issues = data.data?.issues || [];
+        if (issues.length === 0) {
+          toast.success('팩트체크 완료: 문제 없음');
+        } else {
+          toast.warning(`팩트체크 완료: ${issues.length}개의 이슈 발견`);
+        }
+      }
+
+      if (featureId === 'style-unify') {
+        const suggestions = data.data?.suggestions || [];
+        if (suggestions.length === 0) {
+          toast.success('문체 통일 완료: 일관성 있음');
+        } else {
+          toast.info(`문체 통일 완료: ${suggestions.length}개의 제안`);
+        }
+      }
+
+      if (featureId === 'sensitivity-check') {
+        const items = data.data?.items || [];
+        if (items.length === 0) {
+          toast.success('민감도 검사 완료: 문제 없음');
+        } else {
+          toast.error(`민감도 검사 완료: ${items.length}개의 문제 발견`);
+        }
+      }
+
+      if (featureId === 'duplicate-check') {
+        const hasDuplicates = data.data?.hasDuplicates || false;
+        if (!hasDuplicates) {
+          toast.success('중복 검사 완료: 중복 없음');
+        } else {
+          toast.warning('중복 검사 완료: 중복 내용 발견');
+        }
+      }
+    } catch (error) {
+      console.error('[AI Toolbar] Error:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'AI 기능 실행 중 오류가 발생했습니다.'
+      );
+    } finally {
+      setActiveFeature(null);
     }
-    if (featureId === 'category-suggest' && onCategorySelected) {
-      const categoryResult = result as { category: string };
-      onCategorySelected(categoryResult.category);
-    }
-    if (featureId === 'summarize' && onSummaryGenerated) {
-      const summaryResult = result as { summary: string };
-      onSummaryGenerated(summaryResult.summary);
-    }
-
-    setActiveFeature(null);
   };
 
   return (
@@ -301,9 +317,55 @@ export function AIToolbar({
         fullWidth
         leftIcon={<Sparkles className="w-4 h-4" />}
         disabled={!content.trim() || activeFeature !== null}
-        onClick={() => {
-          // TODO: 전체 검수 실행
-          alert('전체 AI 검수 기능은 API 연동 후 활성화됩니다.');
+        onClick={async () => {
+          if (!content.trim()) {
+            toast.error('본문을 먼저 작성해주세요.');
+            return;
+          }
+
+          setActiveFeature('full-validation');
+          toast.loading('전체 AI 검수를 실행 중입니다...', { id: 'full-validation' });
+
+          try {
+            const response = await fetch('/api/ai/full-validation', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                title: title?.trim() || '',
+                subtitle: subtitle?.trim() || '',
+                content: content.trim(),
+              }),
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+              throw new Error(data.error || '전체 AI 검수 중 오류가 발생했습니다.');
+            }
+
+            // 결과 저장
+            setResults((prev) => ({
+              ...prev,
+              'fact-check': data.data.factCheck.data,
+              'style-unify': data.data.styleAnalysis.data,
+              'duplicate-check': data.data.duplicateCheck.data,
+              'sensitivity-check': data.data.sensitivityCheck.data,
+            }));
+
+            toast.success('전체 AI 검수가 완료되었습니다.', { id: 'full-validation' });
+          } catch (error) {
+            console.error('[AI Toolbar] Full validation error:', error);
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : '전체 AI 검수 중 오류가 발생했습니다.',
+              { id: 'full-validation' }
+            );
+          } finally {
+            setActiveFeature(null);
+          }
         }}
       >
         전체 AI 검수 실행

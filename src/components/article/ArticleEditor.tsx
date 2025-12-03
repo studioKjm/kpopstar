@@ -344,6 +344,8 @@ export function ArticleEditor({ initialData, onSave, onPublish }: ArticleEditorP
         {/* AI 도구 */}
         <Panel>
           <AIToolbar
+            title={title}
+            subtitle={subtitle}
             content={content}
             onTagsGenerated={handleTagsGenerated}
             onCategorySelected={handleCategorySelected}

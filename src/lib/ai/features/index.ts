@@ -95,11 +95,21 @@ export async function generateTags(
  * 기사의 사실 관계, 날짜, 인물 정보 등을 검증
  * 
  * @param content - 기사 본문
+ * @param title - 기사 제목 (선택)
+ * @param subtitle - 기사 부제목 (선택)
  */
 export async function checkFacts(
-  content: string
+  content: string,
+  title?: string,
+  subtitle?: string
 ): Promise<AIResponse<FactCheckResult>> {
-  return executeAIFeature<FactCheckResult>('fact-check', content);
+  // 제목과 본문을 합쳐서 검증
+  const fullContent = [title, subtitle, content].filter(Boolean).join('\n\n');
+  return executeAIFeature<FactCheckResult>('fact-check', fullContent, {
+    title: title || '',
+    subtitle: subtitle || '',
+    content,
+  });
 }
 
 /**
@@ -173,8 +183,14 @@ export async function checkSensitivity(
  * 모든 AI 검수 기능을 한 번에 실행
  * 
  * @param content - 기사 본문
+ * @param title - 기사 제목 (선택)
+ * @param subtitle - 기사 부제목 (선택)
  */
-export async function runFullValidation(content: string): Promise<{
+export async function runFullValidation(
+  content: string,
+  title?: string,
+  subtitle?: string
+): Promise<{
   factCheck: AIResponse<FactCheckResult>;
   styleAnalysis: AIResponse<StyleAnalysisResult>;
   duplicateCheck: AIResponse<DuplicateCheckResult>;
@@ -182,7 +198,7 @@ export async function runFullValidation(content: string): Promise<{
 }> {
   // 병렬로 모든 검수 실행
   const [factCheck, styleAnalysis, duplicateCheck, sensitivityCheck] = await Promise.all([
-    checkFacts(content),
+    checkFacts(content, title, subtitle),
     unifyStyle(content),
     checkDuplicates(content),
     checkSensitivity(content),

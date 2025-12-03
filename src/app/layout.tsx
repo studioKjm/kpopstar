@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: 'NewsFlow AI Console | kpopstar.ai.kr',
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="ko">
       <body className="antialiased">
         {children}
+        <Toaster position="top-right" />
       </body>
     </html>
   );

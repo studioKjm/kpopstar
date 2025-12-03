@@ -27,8 +27,8 @@ export class GeminiProvider implements AIProviderInterface {
 
   constructor(config: GeminiConfig = {}) {
     this.config = {
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-      model: 'gemini-pro',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1',
+      model: 'gemini-2.0-flash', // 사용 가능한 모델: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash
       apiKey: process.env.GEMINI_API_KEY,
       ...config,
     };
@@ -38,8 +38,18 @@ export class GeminiProvider implements AIProviderInterface {
    * 프로바이더 초기화
    */
   async initialize(): Promise<void> {
-    // TODO: Gemini API 연결 검증
-    console.log('[Gemini] Initializing provider...');
+    if (!this.config.apiKey) {
+      console.warn('[Gemini] API key is not configured');
+      this.initialized = false;
+      return;
+    }
+    
+    // API 키 형식 간단 검증 (실제 API 호출은 첫 사용 시 검증)
+    if (!this.config.apiKey.startsWith('AIza')) {
+      console.warn('[Gemini] API key format may be invalid');
+    }
+    
+    console.log('[Gemini] Provider initialized successfully');
     this.initialized = true;
   }
 
@@ -52,69 +62,103 @@ export class GeminiProvider implements AIProviderInterface {
 
   /**
    * 텍스트 생성
-   * @stub 실제 Gemini API 호출로 대체 필요
    */
   async generateText(prompt: string, options?: GenerateOptions): Promise<string> {
-    // TODO: Gemini API 호출 구현
-    // const url = `${this.config.baseUrl}/models/${this.config.model}:generateContent?key=${this.config.apiKey}`;
-    // 
-    // const response = await fetch(url, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({
-    //     contents: [
-    //       {
-    //         parts: [
-    //           { text: options?.systemPrompt ? `${options.systemPrompt}\n\n${prompt}` : prompt }
-    //         ]
-    //       }
-    //     ],
-    //     generationConfig: {
-    //       maxOutputTokens: options?.maxTokens || 1000,
-    //       temperature: options?.temperature || 0.7,
-    //     },
-    //   }),
-    // });
-    // 
-    // const data = await response.json();
-    // return data.candidates[0].content.parts[0].text;
+    if (!this.isAvailable()) {
+      throw new Error('Gemini provider is not available. Please check API key configuration.');
+    }
+
+    const url = `${this.config.baseUrl}/models/${this.config.model}:generateContent?key=${this.config.apiKey}`;
     
-    console.log('[Gemini] generateText called with:', { 
-      promptLength: prompt.length, 
-      options 
-    });
-    
-    // Stub 응답
-    return `[Gemini Stub Response]
-프롬프트가 처리되었습니다.
-실제 API 연동 후 응답이 생성됩니다.`;
+    const fullPrompt = options?.systemPrompt 
+      ? `${options.systemPrompt}\n\n${prompt}`
+      : prompt;
+
+    const timeout = options?.timeout || 30000; // 기본 30초
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: fullPrompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            maxOutputTokens: options?.maxTokens || 1000,
+            temperature: options?.temperature ?? 0.7,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Gemini API error: ${response.status} ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        throw new Error('Invalid response format from Gemini API');
+      }
+
+      return data.candidates[0].content.parts[0].text;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Gemini API request timeout');
+      }
+      throw error;
+    }
   }
 
   /**
    * JSON 형식 응답 생성
-   * @stub 실제 Gemini API 호출로 대체 필요
    */
   async generateJSON<T>(prompt: string, options?: GenerateOptions): Promise<T> {
-    // TODO: Gemini API 호출 (JSON 모드)
-    // const jsonPrompt = `${prompt}\n\n응답은 반드시 유효한 JSON 형식이어야 합니다. 다른 텍스트 없이 JSON만 출력하세요.`;
-    // const response = await this.generateText(jsonPrompt, options);
-    // 
-    // // JSON 추출 (마크다운 코드 블록 처리)
-    // const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || 
-    //                   response.match(/```\s*([\s\S]*?)\s*```/);
-    // const jsonStr = jsonMatch ? jsonMatch[1] : response;
-    // 
-    // return JSON.parse(jsonStr.trim());
+    const jsonPrompt = `${prompt}\n\n중요: 응답은 반드시 유효한 JSON 형식이어야 합니다. 다른 설명이나 텍스트 없이 순수 JSON만 출력하세요. JSON은 마크다운 코드 블록 없이 직접 출력해야 합니다.`;
     
-    console.log('[Gemini] generateJSON called with:', { 
-      promptLength: prompt.length, 
-      options 
+    const response = await this.generateText(jsonPrompt, {
+      ...options,
+      temperature: 0.3, // JSON 생성 시 낮은 온도로 일관성 확보
     });
+
+    // JSON 추출 (마크다운 코드 블록 처리)
+    let jsonStr = response.trim();
     
-    // Stub 응답 - 실제 구현에서는 Gemini API 응답을 파싱하여 반환
-    throw new Error('Gemini JSON generation not implemented. Please implement API integration.');
+    // 마크다운 코드 블록 제거
+    const jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      jsonStr.match(/```\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1].trim();
+    }
+
+    // JSON 파싱 시도
+    try {
+      return JSON.parse(jsonStr) as T;
+    } catch (parseError) {
+      // 파싱 실패 시 첫 번째 JSON 객체만 추출 시도
+      const jsonObjectMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonObjectMatch) {
+        try {
+          return JSON.parse(jsonObjectMatch[0]) as T;
+        } catch {
+          throw new Error(`Failed to parse JSON response from Gemini: ${parseError instanceof Error ? parseError.message : 'Unknown error'}\nResponse: ${jsonStr.substring(0, 200)}`);
+        }
+      }
+      throw new Error(`Invalid JSON response from Gemini: ${jsonStr.substring(0, 200)}`);
+    }
   }
 }
 
