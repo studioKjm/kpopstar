@@ -157,25 +157,99 @@ export class GeminiProvider implements AIProviderInterface {
     try {
       return JSON.parse(jsonStr) as T;
     } catch (parseError) {
-      // 파싱 실패 시 첫 번째 JSON 객체만 추출 시도
-      // 중괄호로 시작하고 끝나는 부분 찾기
-      const jsonObjectMatch = jsonStr.match(/\{[\s\S]*\}/);
-      if (jsonObjectMatch) {
-        try {
-          return JSON.parse(jsonObjectMatch[0]) as T;
-        } catch (e) {
-          // 마지막 시도: 불완전한 JSON 수정 시도
-          let cleanedJson = jsonObjectMatch[0];
-          // 불완전한 문자열이나 특수문자 제거
-          cleanedJson = cleanedJson.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-          try {
-            return JSON.parse(cleanedJson) as T;
-          } catch {
-            throw new Error(`Failed to parse JSON response from Gemini: ${parseError instanceof Error ? parseError.message : 'Unknown error'}\nResponse: ${jsonStr.substring(0, 300)}`);
+      // 파싱 실패 시 JSON 복구 시도
+      let cleanedJson = jsonStr;
+      
+      // 1. 첫 번째 완전한 JSON 객체 추출 (중괄호 매칭)
+      let braceCount = 0;
+      let startIdx = cleanedJson.indexOf('{');
+      let endIdx = -1;
+      
+      if (startIdx !== -1) {
+        for (let i = startIdx; i < cleanedJson.length; i++) {
+          const char = cleanedJson[i];
+          const prevChar = i > 0 ? cleanedJson[i - 1] : '';
+          
+          // 문자열 내부가 아닌 경우에만 중괄호 카운트
+          if (char === '{' && prevChar !== '\\') {
+            braceCount++;
+          } else if (char === '}' && prevChar !== '\\') {
+            braceCount--;
+            if (braceCount === 0) {
+              endIdx = i + 1;
+              break;
+            }
           }
         }
+        
+        if (endIdx > startIdx) {
+          cleanedJson = cleanedJson.substring(startIdx, endIdx);
+        }
       }
-      throw new Error(`Invalid JSON response from Gemini. Expected JSON object but got: ${jsonStr.substring(0, 300)}`);
+      
+      // 2. 불완전한 JSON 수정
+      // - 마지막 쉼표 제거
+      cleanedJson = cleanedJson.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+      // - 배열 마지막 쉼표 제거
+      cleanedJson = cleanedJson.replace(/,\s*\]/g, ']');
+      
+      // 3. 첫 번째 시도: 수정된 JSON 파싱
+      try {
+        return JSON.parse(cleanedJson) as T;
+      } catch (e1) {
+        // 4. 두 번째 시도: 문자열 내 제대로 이스케이프되지 않은 따옴표 처리
+        // 속성 값 내 큰따옴표를 이스케이프
+        let escapedJson = cleanedJson;
+        // 속성 값 패턴: "key": "value" 에서 value 내 따옴표 이스케이프
+        escapedJson = escapedJson.replace(/:\s*"([^"]*(?:\\.[^"]*)*)"/g, (match, value) => {
+          // 이미 이스케이프된 따옴표는 제외하고 처리
+          const escaped = value.replace(/(?<!\\)"/g, '\\"');
+          return `: "${escaped}"`;
+        });
+        
+        try {
+          return JSON.parse(escapedJson) as T;
+        } catch (e2) {
+          // 5. 최종 시도: 에러 위치 주변 컨텍스트 확인하여 수동 복구
+          const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown error';
+          const posMatch = errorMsg.match(/position (\d+)/);
+          const pos = posMatch ? parseInt(posMatch[1]) : -1;
+          
+          if (pos > 0 && pos < cleanedJson.length) {
+            // 에러 위치 주변 확인
+            const contextStart = Math.max(0, pos - 100);
+            const contextEnd = Math.min(cleanedJson.length, pos + 100);
+            const context = cleanedJson.substring(contextStart, contextEnd);
+            
+            // 문자열 내 따옴표 문제 수정 시도
+            let fixedJson = cleanedJson;
+            // 속성 값에서 따옴표가 제대로 닫히지 않은 경우 수정
+            fixedJson = fixedJson.replace(/:\s*"([^"]*?)(?:"|,|\n|$)/g, (match, value, end) => {
+              if (!end || end === '\n' || end === '') {
+                // 따옴표가 닫히지 않은 경우 닫기
+                return `: "${value.replace(/"/g, '\\"')}"${end || ''}`;
+              }
+              return match;
+            });
+            
+            try {
+              return JSON.parse(fixedJson) as T;
+            } catch (e3) {
+              throw new Error(
+                `Failed to parse JSON response from Gemini: ${errorMsg}\n` +
+                `Error position: ${pos}\n` +
+                `Context: ${context}\n` +
+                `Response (first 800 chars): ${jsonStr.substring(0, 800)}`
+              );
+            }
+          }
+          
+          throw new Error(
+            `Failed to parse JSON response from Gemini: ${errorMsg}\n` +
+            `Response (first 800 chars): ${jsonStr.substring(0, 800)}`
+          );
+        }
+      }
     }
   }
 }
