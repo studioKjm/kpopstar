@@ -165,6 +165,10 @@ export function TagInput({
           size="sm"
           removable
           onRemove={() => handleRemove(tag)}
+          onClick={() => {
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(tag)}`;
+            window.open(searchUrl, '_blank');
+          }}
         >
           #{tag}
         </Tag>

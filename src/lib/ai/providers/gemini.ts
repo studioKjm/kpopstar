@@ -160,24 +160,42 @@ export class GeminiProvider implements AIProviderInterface {
       // 파싱 실패 시 JSON 복구 시도
       let cleanedJson = jsonStr;
       
-      // 1. 첫 번째 완전한 JSON 객체 추출 (중괄호 매칭)
+      // 1. 첫 번째 완전한 JSON 객체 추출 (중괄호 매칭, 문자열 내부 고려)
       let braceCount = 0;
       let startIdx = cleanedJson.indexOf('{');
       let endIdx = -1;
+      let inString = false;
+      let escapeNext = false;
       
       if (startIdx !== -1) {
         for (let i = startIdx; i < cleanedJson.length; i++) {
           const char = cleanedJson[i];
-          const prevChar = i > 0 ? cleanedJson[i - 1] : '';
+          
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escapeNext = true;
+            continue;
+          }
+          
+          if (char === '"' && !escapeNext) {
+            inString = !inString;
+            continue;
+          }
           
           // 문자열 내부가 아닌 경우에만 중괄호 카운트
-          if (char === '{' && prevChar !== '\\') {
-            braceCount++;
-          } else if (char === '}' && prevChar !== '\\') {
-            braceCount--;
-            if (braceCount === 0) {
-              endIdx = i + 1;
-              break;
+          if (!inString) {
+            if (char === '{') {
+              braceCount++;
+            } else if (char === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                endIdx = i + 1;
+                break;
+              }
             }
           }
         }
@@ -223,11 +241,46 @@ export class GeminiProvider implements AIProviderInterface {
             
             // 문자열 내 따옴표 문제 수정 시도
             let fixedJson = cleanedJson;
-            // 속성 값에서 따옴표가 제대로 닫히지 않은 경우 수정
-            fixedJson = fixedJson.replace(/:\s*"([^"]*?)(?:"|,|\n|$)/g, (match, value, end) => {
-              if (!end || end === '\n' || end === '') {
+            
+            // 방법 1: 닫히지 않은 문자열 찾아서 닫기
+            let inString = false;
+            let stringStart = -1;
+            let fixedChars: string[] = [];
+            
+            for (let i = 0; i < fixedJson.length; i++) {
+              const char = fixedJson[i];
+              const prevChar = i > 0 ? fixedJson[i - 1] : '';
+              
+              if (prevChar !== '\\' && char === '"') {
+                if (!inString) {
+                  inString = true;
+                  stringStart = i;
+                } else {
+                  inString = false;
+                  stringStart = -1;
+                }
+                fixedChars.push(char);
+              } else if (inString && (char === '\n' || char === '\r')) {
+                // 문자열 내 줄바꿈은 이스케이프 처리
+                fixedChars.push('\\n');
+              } else if (inString && i === fixedJson.length - 1) {
+                // 문자열이 끝까지 닫히지 않은 경우 닫기
+                fixedChars.push(char);
+                fixedChars.push('"');
+                inString = false;
+              } else {
+                fixedChars.push(char);
+              }
+            }
+            
+            fixedJson = fixedChars.join('');
+            
+            // 방법 2: 불완전한 속성 값 복구
+            fixedJson = fixedJson.replace(/:\s*"([^"]*?)(?:"|,|\n|\r|$)/g, (match, value, end) => {
+              if (!end || end === '\n' || end === '\r' || end === '') {
                 // 따옴표가 닫히지 않은 경우 닫기
-                return `: "${value.replace(/"/g, '\\"')}"${end || ''}`;
+                const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                return `: "${escaped}"${end || ''}`;
               }
               return match;
             });

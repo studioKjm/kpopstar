@@ -336,7 +336,6 @@ export function ArticleEditor({ initialData, onSave, onPublish }: ArticleEditorP
                       {(aiResults['duplicate-check'] as { duplicates?: Array<{ text: string; count: number }> }).duplicates?.map((dup, idx) => (
                         <div key={idx} className="text-sm p-2 rounded bg-amber-50 border border-amber-200">
                           <span className="font-medium">{dup.text}</span>
-                          <span className="text-xs text-amber-600 ml-2">({dup.count}회 반복)</span>
                         </div>
                       ))}
                     </div>
