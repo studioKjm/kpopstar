@@ -47,3 +47,6 @@ next-env.d.ts
 .turbo
 
 .env*.local
+# Scripts with potential secrets
+scripts/*.sh
+!scripts/*.example.sh
