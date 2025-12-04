@@ -294,6 +294,67 @@ JSON 형식으로 응답:
   outputFormat: 'json',
 };
 
+/**
+ * 오탈자 체크 프롬프트
+ */
+export const SPELL_CHECK_PROMPT: PromptTemplate = {
+  name: 'spell-check',
+  description: '오탈자, 맞춤법, 띄어쓰기 검사',
+  systemPrompt: SYSTEM_PROMPTS.KPOP_NEWS_EXPERT,
+  userPromptTemplate: `다음 기사에서 오탈자, 맞춤법 오류, 띄어쓰기 오류를 검사해주세요.
+
+[기사 제목]
+{{title}}
+
+[기사 부제목]
+{{subtitle}}
+
+[기사 본문]
+{{content}}
+
+[검사 항목]
+1. 맞춤법 오류
+   - 한글 맞춤법 규칙 위반
+   - 잘못된 단어 사용
+   - 오타 (예: "컴백" → "컴백", "발매" → "발매")
+2. 띄어쓰기 오류
+   - 단어 간 띄어쓰기 규칙 위반
+   - 조사, 어미 띄어쓰기
+3. 문법 오류
+   - 문장 구조 오류
+   - 조사 사용 오류
+4. 문장 부호 오류
+   - 쉼표, 마침표 사용
+   - 따옴표, 괄호 사용
+5. 단어 선택 오류
+   - 비슷한 의미의 단어 혼용
+   - 잘못된 용어 사용
+
+[중요 지침]
+- 모든 오류를 찾아내되, 확실하지 않은 것은 제외
+- 각 오류에 대해 원본 텍스트와 수정 제안을 명시
+- 오류의 심각도를 정확히 판단 (low: 경미한 오류, medium: 수정 권장, high: 반드시 수정)
+- 연예 뉴스 특성상 아티스트명, 그룹명, 곡명 등은 정확한 표기를 확인
+- 문맥을 고려하여 오류 여부 판단
+
+JSON 형식으로 응답:
+{
+  "hasErrors": boolean,
+  "errors": [
+    {
+      "type": "typo" | "spacing" | "grammar" | "punctuation" | "word-choice",
+      "severity": "low" | "medium" | "high",
+      "original": "오류가 있는 원본 텍스트",
+      "corrected": "수정된 텍스트",
+      "reason": "오류 설명 및 수정 이유",
+      "context": "오류가 발생한 문맥 (선택)"
+    }
+  ],
+  "totalErrors": number
+}`,
+  outputFormat: 'json',
+};
+
 // =============================================
 // 프롬프트 유틸리티 함수
 // =============================================
@@ -327,6 +388,7 @@ export function getPromptByFeature(feature: string): PromptTemplate | null {
     'summarize': SUMMARIZE_PROMPT,
     'category-suggest': CATEGORY_SUGGEST_PROMPT,
     'sensitivity-check': SENSITIVITY_CHECK_PROMPT,
+    'spell-check': SPELL_CHECK_PROMPT,
   };
   
   return prompts[feature] || null;

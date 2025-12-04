@@ -53,6 +53,7 @@ export {
   summarize,
   suggestCategory,
   checkSensitivity,
+  checkSpelling,
   runFullValidation,
 } from './features';
 

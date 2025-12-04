@@ -15,6 +15,7 @@ import {
   summarize,
   suggestCategory,
   checkSensitivity,
+  checkSpelling,
   runFullValidation,
 } from '@/lib/ai/features';
 import { initializeAllProviders } from '@/lib/ai/providers';
@@ -28,6 +29,7 @@ const AI_FEATURES: Record<string, (content: string, options?: any) => Promise<an
   'summarize': async (content, options) => summarize(content, options?.type || 'brief'),
   'category-suggest': suggestCategory,
   'sensitivity-check': checkSensitivity,
+  'spell-check': checkSpelling,
 };
 
 /**
@@ -114,9 +116,14 @@ export async function POST(
       );
     }
 
-    // 팩트체크는 제목과 부제목을 함께 전달
+    // 팩트체크와 오탈자 체크는 제목과 부제목을 함께 전달
     if (feature === 'fact-check') {
       const result = await checkFacts(content, title, subtitle);
+      return NextResponse.json(result);
+    }
+
+    if (feature === 'spell-check') {
+      const result = await checkSpelling(content, title, subtitle);
       return NextResponse.json(result);
     }
 

@@ -15,6 +15,7 @@ import type {
   StyleAnalysisResult,
   DuplicateCheckResult,
   SensitivityResult,
+  SpellCheckResult,
 } from '@/types';
 
 // =============================================
@@ -149,6 +150,7 @@ export type AIFeatureResponse = {
   'category-suggest': CategorySuggestResponse;
   'sensitivity-check': SensitivityResult;
   'similarity-check': { similarArticles: { id: string; similarity: number }[] };
+  'spell-check': SpellCheckResult;
 };
 
 // =============================================
@@ -177,5 +179,6 @@ export type {
   StyleAnalysisResult,
   DuplicateCheckResult,
   SensitivityResult,
+  SpellCheckResult,
 };
 

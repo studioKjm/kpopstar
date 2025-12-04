@@ -20,6 +20,7 @@ import type {
   StyleAnalysisResult,
   DuplicateCheckResult,
   SensitivityResult,
+  SpellCheckResult,
 } from '../types';
 
 // =============================================
@@ -172,6 +173,28 @@ export async function checkSensitivity(
   content: string
 ): Promise<AIResponse<SensitivityResult>> {
   return executeAIFeature<SensitivityResult>('sensitivity-check', content);
+}
+
+/**
+ * 오탈자 체크
+ * 맞춤법, 띄어쓰기, 문법 오류 검사
+ * 
+ * @param content - 기사 본문
+ * @param title - 기사 제목 (선택)
+ * @param subtitle - 기사 부제목 (선택)
+ */
+export async function checkSpelling(
+  content: string,
+  title?: string,
+  subtitle?: string
+): Promise<AIResponse<SpellCheckResult>> {
+  // 제목과 본문을 합쳐서 검증
+  const fullContent = [title, subtitle, content].filter(Boolean).join('\n\n');
+  return executeAIFeature<SpellCheckResult>('spell-check', fullContent, {
+    title: title || '',
+    subtitle: subtitle || '',
+    content,
+  });
 }
 
 // =============================================

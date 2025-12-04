@@ -165,7 +165,8 @@ export type AIFeatureType =
   | 'rewrite'           // 리라이팅
   | 'category-suggest'  // 카테고리 추천
   | 'sensitivity-check' // 민감도 검사
-  | 'similarity-check'; // 유사도 검사
+  | 'similarity-check'  // 유사도 검사
+  | 'spell-check';      // 오탈자 체크
 
 /** AI 요청 기본 인터페이스 */
 export interface AIRequest {
@@ -202,6 +203,23 @@ export interface CategorySuggestResponse {
   subCategory?: EntertainmentSubCategory;
   confidence: number;
   alternatives: { category: ArticleCategory; confidence: number }[];
+}
+
+/** 오탈자 체크 결과 */
+export interface SpellCheckResult {
+  hasErrors: boolean;
+  errors: SpellCheckError[];
+  totalErrors: number;
+}
+
+export interface SpellCheckError {
+  type: 'typo' | 'spacing' | 'grammar' | 'punctuation' | 'word-choice';
+  severity: 'low' | 'medium' | 'high';
+  original: string;
+  corrected: string;
+  reason: string;
+  position?: { start: number; end: number };
+  context?: string; // 오류가 발생한 문맥
 }
 
 // =============================================

@@ -116,33 +116,34 @@ interface CollapsiblePanelProps {
 export function CollapsiblePanel({
   children,
   title,
-  defaultOpen = true,
+  defaultOpen = false,
   className,
 }: CollapsiblePanelProps) {
   return (
-    <details open={defaultOpen} className={cn('group', className)}>
-      <summary
-        className={cn(
-          'flex items-center justify-between p-4 cursor-pointer',
-          'bg-surface-50 rounded-t-xl',
-          'hover:bg-surface-100 transition-colors',
-          'list-none [&::-webkit-details-marker]:hidden'
-        )}
-      >
-        <span className="font-medium text-surface-900">{title}</span>
-        <svg
-          className="w-5 h-5 text-surface-500 transition-transform group-open:rotate-180"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+    <Panel className={cn('overflow-hidden', className)}>
+      <details open={defaultOpen} className="group">
+        <summary
+          className={cn(
+            'flex items-center justify-between cursor-pointer',
+            'list-none [&::-webkit-details-marker]:hidden',
+            '-m-6 p-6 mb-0'
+          )}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </summary>
-      <div className="p-4 border border-t-0 border-surface-200 rounded-b-xl">
-        {children}
-      </div>
-    </details>
+          <h2 className="text-lg font-semibold text-surface-900">{title}</h2>
+          <svg
+            className="w-5 h-5 text-surface-500 transition-transform group-open:rotate-180"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div className="mt-6">
+          {children}
+        </div>
+      </details>
+    </Panel>
   );
 }
 

@@ -14,6 +14,7 @@ import {
   Copy,
   LayoutGrid,
   Loader2,
+  SpellCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -68,6 +69,13 @@ const AI_FEATURES = [
     description: '자동 카테고리 분류',
     color: 'text-pink-600',
   },
+  {
+    id: 'spell-check',
+    label: '오탈자 체크',
+    icon: SpellCheck,
+    description: '맞춤법·띄어쓰기 검사',
+    color: 'text-indigo-600',
+  },
 ];
 
 interface AIToolbarProps {
@@ -77,6 +85,7 @@ interface AIToolbarProps {
   onTagsGenerated?: (tags: string[]) => void;
   onCategorySelected?: (category: string) => void;
   onSummaryGenerated?: (summary: string) => void;
+  onResultsGenerated?: (results: Record<string, any>) => void;
   className?: string;
 }
 
@@ -91,10 +100,11 @@ export function AIToolbar({
   onTagsGenerated,
   onCategorySelected,
   onSummaryGenerated,
+  onResultsGenerated,
   className,
 }: AIToolbarProps) {
   const [activeFeature, setActiveFeature] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, unknown>>({});
+  const [results, setResults] = useState<Record<string, any>>({});
 
   // AI 기능 실행
   const handleFeatureClick = async (featureId: string) => {
@@ -126,7 +136,11 @@ export function AIToolbar({
       }
 
       // 결과 저장
-      setResults((prev) => ({ ...prev, [featureId]: data.data }));
+      const newResults = { ...results, [featureId]: data.data };
+      setResults(newResults);
+      
+      // 결과 콜백 호출 (기사 하단에 표시하기 위해)
+      onResultsGenerated?.(newResults);
 
       // 콜백 호출
       if (featureId === 'auto-tag' && onTagsGenerated && data.data?.tags) {
@@ -147,7 +161,9 @@ export function AIToolbar({
         if (issues.length === 0) {
           toast.success('팩트체크 완료: 문제 없음');
         } else {
-          toast.warning(`팩트체크 완료: ${issues.length}개의 이슈 발견`);
+          toast(`팩트체크 완료: ${issues.length}개의 이슈 발견`, {
+            icon: '⚠️',
+          });
         }
       }
 
@@ -156,7 +172,9 @@ export function AIToolbar({
         if (suggestions.length === 0) {
           toast.success('문체 통일 완료: 일관성 있음');
         } else {
-          toast.info(`문체 통일 완료: ${suggestions.length}개의 제안`);
+          toast(`문체 통일 완료: ${suggestions.length}개의 제안`, {
+            icon: 'ℹ️',
+          });
         }
       }
 
@@ -174,7 +192,21 @@ export function AIToolbar({
         if (!hasDuplicates) {
           toast.success('중복 검사 완료: 중복 없음');
         } else {
-          toast.warning('중복 검사 완료: 중복 내용 발견');
+          toast('중복 검사 완료: 중복 내용 발견', {
+            icon: '⚠️',
+          });
+        }
+      }
+
+      if (featureId === 'spell-check') {
+        const errors = data.data?.errors || [];
+        const totalErrors = data.data?.totalErrors || 0;
+        if (totalErrors === 0) {
+          toast.success('오탈자 체크 완료: 오류 없음');
+        } else {
+          toast(`오탈자 체크 완료: ${totalErrors}개의 오류 발견`, {
+            icon: '⚠️',
+          });
         }
       }
     } catch (error) {
@@ -201,7 +233,7 @@ export function AIToolbar({
         {AI_FEATURES.map((feature) => {
           const Icon = feature.icon;
           const isActive = activeFeature === feature.id;
-          const hasResult = results[feature.id];
+          const hasResult = !!results[feature.id];
 
           return (
             <button
@@ -214,7 +246,7 @@ export function AIToolbar({
                 'hover:border-primary-300 hover:bg-primary-50/50',
                 'transition-all duration-200',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
-                hasResult && 'border-emerald-300 bg-emerald-50/50'
+                hasResult ? 'border-emerald-300 bg-emerald-50/50' : ''
               )}
             >
               {isActive ? (
@@ -227,89 +259,13 @@ export function AIToolbar({
                   {feature.label}
                 </p>
               </div>
-              {hasResult && (
+              {hasResult ? (
                 <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              )}
+              ) : null}
             </button>
           );
         })}
       </div>
-
-      {/* 결과 표시 영역 */}
-      {Object.keys(results).length > 0 && (
-        <div className="mt-4 p-4 rounded-lg bg-surface-50 border border-surface-200">
-          <h4 className="text-sm font-medium text-surface-700 mb-3">
-            AI 검수 결과
-          </h4>
-          
-          <div className="space-y-3">
-            {/* 태그 결과 */}
-            {results['auto-tag'] && (
-              <div>
-                <p className="text-xs text-surface-500 mb-1">생성된 태그</p>
-                <div className="flex flex-wrap gap-1">
-                  {(results['auto-tag'] as { tags: string[] }).tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 text-xs bg-primary-100 text-primary-700 rounded-full"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 팩트체크 결과 */}
-            {results['fact-check'] && (
-              <div>
-                <p className="text-xs text-surface-500 mb-1">팩트체크</p>
-                {(results['fact-check'] as { issues: { message: string; severity: string }[] }).issues.length > 0 ? (
-                  <div className="space-y-1">
-                    {(results['fact-check'] as { issues: { message: string; severity: string }[] }).issues.map((issue, idx) => (
-                      <div
-                        key={idx}
-                        className={cn(
-                          'flex items-center gap-2 text-xs p-2 rounded',
-                          issue.severity === 'error' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
-                        )}
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                        {issue.message}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    문제 없음
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* 요약 결과 */}
-            {results['summarize'] && (
-              <div>
-                <p className="text-xs text-surface-500 mb-1">요약</p>
-                <p className="text-sm text-surface-700">
-                  {(results['summarize'] as { summary: string }).summary}
-                </p>
-              </div>
-            )}
-
-            {/* 카테고리 추천 결과 */}
-            {results['category-suggest'] && (
-              <div>
-                <p className="text-xs text-surface-500 mb-1">추천 카테고리</p>
-                <Badge variant="primary">
-                  {(results['category-suggest'] as { category: string }).category}
-                </Badge>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* 전체 검수 버튼 */}
       <Button
@@ -346,13 +302,18 @@ export function AIToolbar({
             }
 
             // 결과 저장
-            setResults((prev) => ({
-              ...prev,
+            const newResults = {
+              ...results,
               'fact-check': data.data.factCheck.data,
               'style-unify': data.data.styleAnalysis.data,
               'duplicate-check': data.data.duplicateCheck.data,
               'sensitivity-check': data.data.sensitivityCheck.data,
-            }));
+              'spell-check': data.data.spellCheck.data,
+            };
+            setResults(newResults);
+            
+            // 결과 콜백 호출 (기사 하단에 표시하기 위해)
+            onResultsGenerated?.(newResults);
 
             toast.success('전체 AI 검수가 완료되었습니다.', { id: 'full-validation' });
           } catch (error) {

@@ -20,6 +20,7 @@ K-POP 및 연예 뉴스 전문 언론사를 위한 AI 기반 기사 관리 시�
 - **🛡️ 민감도 검사**: 부적절한 표현, 금칙어 감지
 - **📝 요약**: 다양한 형식의 기사 요약 생성
 - **📂 카테고리 추천**: 자동 카테고리 분류
+- **✏️ 오탈자 체크**: 맞춤법, 띄어쓰기, 문법 검사
 
 ## 🛠️ 기술 스택
 
@@ -27,7 +28,8 @@ K-POP 및 연예 뉴스 전문 언론사를 위한 AI 기반 기사 관리 시�
 - **언어**: TypeScript
 - **스타일링**: Tailwind CSS
 - **상태 관리**: Zustand
-- **AI**: Base44 / Google Gemini Pro (선택 가능)
+- **AI**: Google Gemini Pro
+- **배포**: Vercel
 
 ## 📁 프로젝트 구조
 
@@ -90,12 +92,17 @@ cp .env.example .env.local
 `.env.local` 파일을 열어 API 키를 설정하세요:
 
 ```env
-# AI 프로바이더 선택 (base44 또는 gemini)
+# AI 프로바이더
 NEXT_PUBLIC_AI_PROVIDER=gemini
 
-# Gemini API 키
+# Gemini API 키 (Google AI Studio에서 발급)
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
+**Gemini API 키 발급 방법:**
+1. [Google AI Studio](https://aistudio.google.com/) 접속
+2. "Get API Key" 클릭
+3. 새 API 키 생성 및 복사
 
 ### 3. 개발 서버 실행
 
@@ -104,6 +111,27 @@ npm run dev
 ```
 
 브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 확인하세요.
+
+## 🚀 배포하기
+
+### Vercel 배포 (권장)
+
+자세한 배포 가이드는 [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md)를 참고하세요.
+
+**빠른 배포:**
+
+```bash
+# 1. 로그인 (npx 사용 - 설치 불필요)
+npx vercel login
+
+# 2. 배포
+npx vercel --prod
+```
+
+**환경 변수 설정:**
+- Vercel 대시보드 → 프로젝트 → Settings → Environment Variables
+- `NEXT_PUBLIC_AI_PROVIDER=gemini`
+- `GEMINI_API_KEY=your_key`
 
 ## 📖 사용 가이드
 

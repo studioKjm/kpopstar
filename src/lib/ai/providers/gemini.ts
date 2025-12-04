@@ -137,27 +137,45 @@ export class GeminiProvider implements AIProviderInterface {
     // JSON 추출 (마크다운 코드 블록 처리)
     let jsonStr = response.trim();
     
-    // 마크다운 코드 블록 제거
-    const jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/) || 
-                      jsonStr.match(/```\s*([\s\S]*?)\s*```/);
+    // 마크다운 코드 블록 제거 (여러 패턴 시도)
+    // ```json ... ``` 패턴
+    let jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim();
+    } else {
+      // ``` ... ``` 패턴
+      jsonMatch = jsonStr.match(/```\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1].trim();
+      }
     }
+
+    // 앞뒤 불필요한 텍스트 제거 (예: "```json" 같은 부분이 남아있을 수 있음)
+    jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
 
     // JSON 파싱 시도
     try {
       return JSON.parse(jsonStr) as T;
     } catch (parseError) {
       // 파싱 실패 시 첫 번째 JSON 객체만 추출 시도
+      // 중괄호로 시작하고 끝나는 부분 찾기
       const jsonObjectMatch = jsonStr.match(/\{[\s\S]*\}/);
       if (jsonObjectMatch) {
         try {
           return JSON.parse(jsonObjectMatch[0]) as T;
-        } catch {
-          throw new Error(`Failed to parse JSON response from Gemini: ${parseError instanceof Error ? parseError.message : 'Unknown error'}\nResponse: ${jsonStr.substring(0, 200)}`);
+        } catch (e) {
+          // 마지막 시도: 불완전한 JSON 수정 시도
+          let cleanedJson = jsonObjectMatch[0];
+          // 불완전한 문자열이나 특수문자 제거
+          cleanedJson = cleanedJson.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+          try {
+            return JSON.parse(cleanedJson) as T;
+          } catch {
+            throw new Error(`Failed to parse JSON response from Gemini: ${parseError instanceof Error ? parseError.message : 'Unknown error'}\nResponse: ${jsonStr.substring(0, 300)}`);
+          }
         }
       }
-      throw new Error(`Invalid JSON response from Gemini: ${jsonStr.substring(0, 200)}`);
+      throw new Error(`Invalid JSON response from Gemini. Expected JSON object but got: ${jsonStr.substring(0, 300)}`);
     }
   }
 }
