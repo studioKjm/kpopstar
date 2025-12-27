@@ -211,9 +211,28 @@ export function AIToolbar({
       }
     } catch (error) {
       console.error('[AI Toolbar] Error:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'AI 기능 실행 중 오류가 발생했습니다.'
-      );
+      
+      // 에러 메시지 처리
+      let errorMessage = 'AI 기능 실행 중 오류가 발생했습니다.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // 할당량 초과 에러인 경우 더 명확한 메시지
+        if (error.message.includes('할당량이 초과') || error.message.includes('429')) {
+          toast.error(
+            'Gemini API 할당량 초과\n\n무료 티어의 사용 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+            {
+              duration: 6000,
+              icon: '⚠️',
+            }
+          );
+          return;
+        }
+      }
+      
+      toast.error(errorMessage, {
+        duration: 5000,
+      });
     } finally {
       setActiveFeature(null);
     }
@@ -318,12 +337,26 @@ export function AIToolbar({
             toast.success('전체 AI 검수가 완료되었습니다.', { id: 'full-validation' });
           } catch (error) {
             console.error('[AI Toolbar] Full validation error:', error);
-            toast.error(
-              error instanceof Error
-                ? error.message
-                : '전체 AI 검수 중 오류가 발생했습니다.',
-              { id: 'full-validation' }
-            );
+            
+            let errorMessage = '전체 AI 검수 중 오류가 발생했습니다.';
+            if (error instanceof Error) {
+              errorMessage = error.message;
+              
+              // 할당량 초과 에러인 경우 더 명확한 메시지
+              if (error.message.includes('할당량이 초과') || error.message.includes('429')) {
+                toast.error(
+                  'Gemini API 할당량 초과\n\n무료 티어의 사용 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+                  {
+                    id: 'full-validation',
+                    duration: 6000,
+                    icon: '⚠️',
+                  }
+                );
+                return;
+              }
+            }
+            
+            toast.error(errorMessage, { id: 'full-validation' });
           } finally {
             setActiveFeature(null);
           }

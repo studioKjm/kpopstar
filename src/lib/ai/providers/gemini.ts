@@ -104,6 +104,30 @@ export class GeminiProvider implements AIProviderInterface {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        
+        // 429 할당량 초과 에러 특별 처리
+        if (response.status === 429) {
+          const errorMessage = errorData?.error?.message || '';
+          const retryDelay = errorData?.error?.details?.find(
+            (d: any) => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
+          )?.retryDelay || '17s';
+          
+          // 재시도 가능 시간 추출
+          const retrySeconds = retryDelay.replace('s', '');
+          const retryMinutes = Math.ceil(parseInt(retrySeconds) / 60);
+          
+          throw new Error(
+            `Gemini API 할당량이 초과되었습니다.\n\n` +
+            `무료 티어의 일일/분당 요청 한도를 초과했습니다.\n` +
+            `약 ${retryMinutes}분 후 다시 시도해주세요.\n\n` +
+            `해결 방법:\n` +
+            `1. 잠시 후 다시 시도\n` +
+            `2. Google AI Studio에서 할당량 확인: https://ai.dev/usage?tab=rate-limit\n` +
+            `3. 유료 플랜으로 업그레이드 고려`
+          );
+        }
+        
+        // 기타 API 에러
         throw new Error(`Gemini API error: ${response.status} ${JSON.stringify(errorData)}`);
       }
 
