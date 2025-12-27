@@ -46,15 +46,26 @@ async function executeAIFeature<T>(
       throw new Error(`Unknown feature: ${featureName}`);
     }
     
+    // 본문 길이 제한 (2000자 초과 시 요약)
+    let processedContent = content;
+    const MAX_CONTENT_LENGTH = 2000;
+    
+    if (content.length > MAX_CONTENT_LENGTH) {
+      // 긴 본문은 앞부분만 사용 (토큰 사용량 최적화)
+      processedContent = content.substring(0, MAX_CONTENT_LENGTH) + '\n\n[내용이 길어 일부만 분석합니다]';
+      console.warn(`[AI:${featureName}] Content truncated from ${content.length} to ${MAX_CONTENT_LENGTH} characters`);
+    }
+    
     // 프롬프트 생성
     const prompt = fillPromptTemplate(promptTemplate.userPromptTemplate, {
-      content,
+      content: processedContent,
       ...variables,
     });
     
     // AI 호출
     const result = await provider.generateJSON<T>(prompt, {
       systemPrompt: promptTemplate.systemPrompt,
+      maxTokens: 800, // 기본값 1000에서 800으로 감소 (토큰 사용량 최적화)
     });
     
     return {
@@ -219,13 +230,19 @@ export async function runFullValidation(
   duplicateCheck: AIResponse<DuplicateCheckResult>;
   sensitivityCheck: AIResponse<SensitivityResult>;
 }> {
-  // 병렬로 모든 검수 실행
-  const [factCheck, styleAnalysis, duplicateCheck, sensitivityCheck] = await Promise.all([
-    checkFacts(content, title, subtitle),
-    unifyStyle(content),
-    checkDuplicates(content),
-    checkSensitivity(content),
-  ]);
+  // 순차 실행으로 변경 (RPM 제한 회피)
+  // 무료 티어의 분당 요청 제한(약 15회)을 고려하여 순차 실행
+  const factCheck = await checkFacts(content, title, subtitle);
+  
+  // 요청 간 최소 간격 (1초) - RPM 제한 회피
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  const styleAnalysis = await unifyStyle(content);
+  
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  const duplicateCheck = await checkDuplicates(content);
+  
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  const sensitivityCheck = await checkSensitivity(content);
   
   return {
     factCheck,

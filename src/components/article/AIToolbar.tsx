@@ -105,6 +105,10 @@ export function AIToolbar({
 }: AIToolbarProps) {
   const [activeFeature, setActiveFeature] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, any>>({});
+  const [lastRequestTime, setLastRequestTime] = useState<number>(0);
+  
+  // 요청 빈도 제한 (최소 3초 간격)
+  const MIN_REQUEST_INTERVAL = 3000;
 
   // AI 기능 실행
   const handleFeatureClick = async (featureId: string) => {
@@ -113,7 +117,26 @@ export function AIToolbar({
       return;
     }
 
+    // 요청 빈도 제한 체크
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+      const remainingSeconds = Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000);
+      toast.error(`요청 간격을 두고 시도해주세요. (${remainingSeconds}초 후 가능)`);
+      return;
+    }
+
+    // 본문 길이 경고 (2000자 초과 시)
+    if (content.length > 2000) {
+      toast('긴 본문은 일부만 분석됩니다. (2000자 제한)', {
+        icon: '⚠️',
+        duration: 3000,
+      });
+    }
+
     setActiveFeature(featureId);
+    setLastRequestTime(now);
 
     try {
       const response = await fetch(`/api/ai/${featureId}`, {
@@ -298,7 +321,26 @@ export function AIToolbar({
             return;
           }
 
+          // 요청 빈도 제한 체크
+          const now = Date.now();
+          const timeSinceLastRequest = now - lastRequestTime;
+          
+          if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+            const remainingSeconds = Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000);
+            toast.error(`요청 간격을 두고 시도해주세요. (${remainingSeconds}초 후 가능)`);
+            return;
+          }
+
+          // 본문 길이 경고
+          if (content.length > 2000) {
+            toast('긴 본문은 일부만 분석됩니다. (2000자 제한)', {
+              icon: '⚠️',
+              duration: 3000,
+            });
+          }
+
           setActiveFeature('full-validation');
+          setLastRequestTime(now);
           toast.loading('전체 AI 검수를 실행 중입니다...', { id: 'full-validation' });
 
           try {
