@@ -112,18 +112,49 @@ export class GeminiProvider implements AIProviderInterface {
             (d: any) => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
           )?.retryDelay || '17s';
           
-          // 재시도 가능 시간 추출
-          const retrySeconds = retryDelay.replace('s', '');
-          const retryMinutes = Math.ceil(parseInt(retrySeconds) / 60);
+          // 재시도 가능 시간 추출 (초 단위)
+          const retrySeconds = parseInt(retryDelay.replace('s', '')) || 17;
+          const retryMinutes = Math.floor(retrySeconds / 60);
+          const remainingSeconds = retrySeconds % 60;
+          
+          // 할당량 유형 확인 (일일 vs 분당)
+          const quotaViolations = errorData?.error?.details?.find(
+            (d: any) => d['@type'] === 'type.googleapis.com/google.rpc.QuotaFailure'
+          )?.violations || [];
+          
+          const isDailyLimit = quotaViolations.some((v: any) => 
+            v.quotaMetric?.includes('PerDay') || v.quotaId?.includes('PerDay')
+          );
+          const isMinuteLimit = quotaViolations.some((v: any) => 
+            v.quotaMetric?.includes('PerMinute') || v.quotaId?.includes('PerMinute')
+          );
+          
+          let quotaType = '';
+          let resetTime = '';
+          
+          if (isDailyLimit) {
+            quotaType = '일일 요청 한도';
+            resetTime = '내일 오전 10시 (한국 시간)';
+          } else if (isMinuteLimit) {
+            quotaType = '분당 요청 한도';
+            resetTime = retrySeconds < 60 
+              ? `${retrySeconds}초 후` 
+              : `${retryMinutes}분 ${remainingSeconds > 0 ? `${remainingSeconds}초` : ''} 후`;
+          } else {
+            quotaType = '요청 한도';
+            resetTime = retrySeconds < 60 
+              ? `${retrySeconds}초 후` 
+              : `${retryMinutes}분 ${remainingSeconds > 0 ? `${remainingSeconds}초` : ''} 후`;
+          }
           
           throw new Error(
-            `Gemini API 할당량이 초과되었습니다.\n\n` +
-            `무료 티어의 일일/분당 요청 한도를 초과했습니다.\n` +
-            `약 ${retryMinutes}분 후 다시 시도해주세요.\n\n` +
+            `Gemini API 할당량 초과\n\n` +
+            `무료 티어의 ${quotaType}를 초과했습니다.\n` +
+            `재시도 가능: ${resetTime}\n\n` +
             `해결 방법:\n` +
-            `1. 잠시 후 다시 시도\n` +
-            `2. Google AI Studio에서 할당량 확인: https://ai.dev/usage?tab=rate-limit\n` +
-            `3. 유료 플랜으로 업그레이드 고려`
+            `1. ${resetTime} 다시 시도\n` +
+            `2. 할당량 확인: https://ai.dev/usage?tab=rate-limit\n` +
+            `3. 유료 플랜 업그레이드 고려`
           );
         }
         

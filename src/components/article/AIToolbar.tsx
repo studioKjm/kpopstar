@@ -106,14 +106,37 @@ export function AIToolbar({
   const [activeFeature, setActiveFeature] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, any>>({});
   const [lastRequestTime, setLastRequestTime] = useState<number>(0);
+  const [quotaExceededUntil, setQuotaExceededUntil] = useState<number | null>(null);
   
   // 요청 빈도 제한 (최소 3초 간격)
   const MIN_REQUEST_INTERVAL = 3000;
+  
+  // 할당량 초과 상태 확인
+  const isQuotaExceeded = quotaExceededUntil !== null && Date.now() < quotaExceededUntil;
 
   // AI 기능 실행
   const handleFeatureClick = async (featureId: string) => {
     if (!content.trim()) {
       toast.error('본문을 먼저 작성해주세요.');
+      return;
+    }
+
+    // 할당량 초과 상태 체크
+    if (isQuotaExceeded) {
+      const remainingTime = Math.ceil((quotaExceededUntil! - Date.now()) / 1000);
+      const minutes = Math.floor(remainingTime / 60);
+      const seconds = remainingTime % 60;
+      const timeText = minutes > 0 
+        ? `${minutes}분 ${seconds}초`
+        : `${seconds}초`;
+      
+      toast.error(
+        `할당량 초과\n\n${timeText} 후 다시 시도해주세요.`,
+        {
+          duration: 5000,
+          icon: '⚠️',
+        }
+      );
       return;
     }
 
@@ -240,12 +263,31 @@ export function AIToolbar({
       if (error instanceof Error) {
         errorMessage = error.message;
         
-        // 할당량 초과 에러인 경우 더 명확한 메시지
+        // 할당량 초과 에러인 경우 더 명확한 메시지 및 기능 비활성화
         if (error.message.includes('할당량이 초과') || error.message.includes('429')) {
+          // 재시도 시간 추출 (에러 메시지에서)
+          let retrySeconds = 60; // 기본값 1분
+          const retryMatch = error.message.match(/(\d+)초 후|(\d+)분 후/);
+          if (retryMatch) {
+            if (error.message.includes('분')) {
+              const minutes = parseInt(retryMatch[1] || retryMatch[2] || '1');
+              retrySeconds = minutes * 60;
+            } else {
+              retrySeconds = parseInt(retryMatch[1] || retryMatch[2] || '60');
+            }
+          }
+          
+          // 할당량 초과 상태 설정 (재시도 시간 + 여유 10초)
+          setQuotaExceededUntil(Date.now() + (retrySeconds * 1000) + 10000);
+          
+          // 에러 메시지에서 재시도 시간 추출하여 표시
+          const messageLines = error.message.split('\n');
+          const retryLine = messageLines.find(line => line.includes('재시도 가능') || line.includes('후'));
+          
           toast.error(
-            'Gemini API 할당량 초과\n\n무료 티어의 사용 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+            retryLine || 'Gemini API 할당량 초과\n\n잠시 후 다시 시도해주세요.',
             {
-              duration: 6000,
+              duration: 8000,
               icon: '⚠️',
             }
           );
@@ -281,14 +323,15 @@ export function AIToolbar({
             <button
               key={feature.id}
               onClick={() => handleFeatureClick(feature.id)}
-              disabled={isActive || !content.trim()}
+              disabled={isActive || !content.trim() || isQuotaExceeded}
               className={cn(
                 'flex items-center gap-2 p-3 rounded-lg text-left',
                 'border border-surface-200 bg-white',
                 'hover:border-primary-300 hover:bg-primary-50/50',
                 'transition-all duration-200',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
-                hasResult ? 'border-emerald-300 bg-emerald-50/50' : ''
+                hasResult ? 'border-emerald-300 bg-emerald-50/50' : '',
+                isQuotaExceeded ? 'opacity-40' : ''
               )}
             >
               {isActive ? (
@@ -309,15 +352,54 @@ export function AIToolbar({
         })}
       </div>
 
+      {/* 할당량 초과 안내 */}
+      {isQuotaExceeded && (
+        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
+          <div className="flex items-center gap-2 text-amber-700 mb-1">
+            <AlertTriangle className="w-4 h-4" />
+            <span className="font-medium">할당량 초과</span>
+          </div>
+          <p className="text-amber-600 text-xs">
+            {(() => {
+              const remainingTime = Math.ceil((quotaExceededUntil! - Date.now()) / 1000);
+              const minutes = Math.floor(remainingTime / 60);
+              const seconds = remainingTime % 60;
+              return minutes > 0 
+                ? `${minutes}분 ${seconds}초 후 다시 시도 가능`
+                : `${seconds}초 후 다시 시도 가능`;
+            })()}
+          </p>
+        </div>
+      )}
+
       {/* 전체 검수 버튼 */}
       <Button
         variant="primary"
         fullWidth
         leftIcon={<Sparkles className="w-4 h-4" />}
-        disabled={!content.trim() || activeFeature !== null}
+        disabled={!content.trim() || activeFeature !== null || isQuotaExceeded}
         onClick={async () => {
           if (!content.trim()) {
             toast.error('본문을 먼저 작성해주세요.');
+            return;
+          }
+
+          // 할당량 초과 상태 체크
+          if (isQuotaExceeded) {
+            const remainingTime = Math.ceil((quotaExceededUntil! - Date.now()) / 1000);
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            const timeText = minutes > 0 
+              ? `${minutes}분 ${seconds}초`
+              : `${seconds}초`;
+            
+            toast.error(
+              `할당량 초과\n\n${timeText} 후 다시 시도해주세요.`,
+              {
+                duration: 5000,
+                icon: '⚠️',
+              }
+            );
             return;
           }
 
@@ -377,20 +459,37 @@ export function AIToolbar({
             onResultsGenerated?.(newResults);
 
             toast.success('전체 AI 검수가 완료되었습니다.', { id: 'full-validation' });
-          } catch (error) {
+            } catch (error) {
             console.error('[AI Toolbar] Full validation error:', error);
             
             let errorMessage = '전체 AI 검수 중 오류가 발생했습니다.';
             if (error instanceof Error) {
               errorMessage = error.message;
               
-              // 할당량 초과 에러인 경우 더 명확한 메시지
+              // 할당량 초과 에러인 경우 더 명확한 메시지 및 기능 비활성화
               if (error.message.includes('할당량이 초과') || error.message.includes('429')) {
+                // 재시도 시간 추출
+                let retrySeconds = 60;
+                const retryMatch = error.message.match(/(\d+)초 후|(\d+)분 후/);
+                if (retryMatch) {
+                  if (error.message.includes('분')) {
+                    const minutes = parseInt(retryMatch[1] || retryMatch[2] || '1');
+                    retrySeconds = minutes * 60;
+                  } else {
+                    retrySeconds = parseInt(retryMatch[1] || retryMatch[2] || '60');
+                  }
+                }
+                
+                setQuotaExceededUntil(Date.now() + (retrySeconds * 1000) + 10000);
+                
+                const messageLines = error.message.split('\n');
+                const retryLine = messageLines.find(line => line.includes('재시도 가능') || line.includes('후'));
+                
                 toast.error(
-                  'Gemini API 할당량 초과\n\n무료 티어의 사용 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+                  retryLine || 'Gemini API 할당량 초과\n\n잠시 후 다시 시도해주세요.',
                   {
                     id: 'full-validation',
-                    duration: 6000,
+                    duration: 8000,
                     icon: '⚠️',
                   }
                 );
